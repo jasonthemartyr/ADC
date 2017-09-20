@@ -26,14 +26,7 @@ get_nodes = ltm.nodes.get_collection()
 # print(test_jason_node.raw)
 
 def build_node(f5_partition,node_name,node_address,node_desc):
-    '''
-    build a node for F5
-    :param f5_partition:
-    :param node_name:
-    :param node_address:
-    :param node_desc:
-    :return:
-    '''
+
     try:
         existing_nodes = mgmt.tm.ltm.nodes.get_collection()
     except ValueError:
@@ -62,6 +55,22 @@ def build_pool(f5_partition, pool_name, pool_desc):
 
             pool = mgmt.tm.ltm.pools.pool.create(partition=f5_partition, name=pool_name, description=pool_desc)
             return pool.raw
+
+
+#function needs testing
+def f5_post_builder(object_name, collection_name, post_cmd):
+    try:
+        existing_collection = 'mgmt.tm.ltm.' + collection_name + '.get_collection()'
+    except ValueError:
+        print("Could not connect to F5")
+    else:
+        object_list = [object.name for object in existing_collection]
+        if object_name in object_list:
+            print("{} exists".format(object_name))
+        else:
+            post = post_cmd
+            return post.raw
+
 
 
 f5_partition = 'CDE-DMZ'
