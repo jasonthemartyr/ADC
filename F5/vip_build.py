@@ -71,7 +71,7 @@ def build_pool(f5_partition,
 
             my_pool = mgmt.tm.ltm.pools.pool.load(partition=f5_partition,
                                                   name=pool_name)
-            node_list = ['{}:{}'.format(name, vip_port) for name, ip in node_dict.items()]
+            node_list = ['{}:{}'.format(name, pool_port) for name, ip in node_dict.items()]
             node_zip = zip(node_list, node_priority)
 
             # for node in node_list:
@@ -126,10 +126,10 @@ def build_vip(f5_partition,
             vip_pool = '/{}/{}_{}_pool'.format(f5_partition,
                                                name,
                                                pool_port)
+
             vip_dest = '/{}/{}%10:{}'.format(f5_partition,
                                              vip_ip,
                                              vip_port)
-            vip_rules = '/Common/http_security'
             vip_protocol = 'tcp'
 
             vip = ltm.virtuals.virtual.create(partition=f5_partition,
@@ -149,10 +149,10 @@ def lets_print_this_bitch(some_list):
     for thingamob in some_list:
         return thingamob
 
-# mgmt = ManagementRoot("x.x.x.x",
-#                       "username",
-#                       "password")
-# ltm = mgmt.tm.ltm
+mgmt = ManagementRoot("x.x.x.x",
+                      "username",
+                      "password")
+ltm = mgmt.tm.ltm
 
 
 ini_file = configparser.ConfigParser()
@@ -179,11 +179,7 @@ node_dict = dict(zip(node_name,
 
 
 
-# build_node = build_node(f5_partition,
-#                         **node_dict)
-#
-# for node in build_node:
-#     print(node)
+
 
 #build pool from ini
 pool = ini_file['pool']
@@ -194,33 +190,46 @@ ramp_time = pool_list[2]
 monitor = pool_list[3]
 pool_port = pool_list[4]
 
-# build_pool = build_pool(f5_partition,
-#                 name,
-#                 node_dict,
-#                 allow_nat,
-#                 allow_snat,
-#                 ramp_time,
-#                 monitor,
-#                 node_priority,
-#                 pool_port)
-# for pool in build_pool:
-#     print(pool)
+
 
 #build vip from ini
 vip = ini_file['vip']
 irules = ini_file['irules']
 vip_list = [vip.get(field) for field in vip]
-vip_ip = vip_list[0::2]
-vip_port = vip_list[1::2]
+vip_ip = vip_list[0]
+vip_port = vip_list[1]
 irules_list = [irules.get(field) for field in irules]
 
-# build_vip = build_vip(f5_partition,
-#                 name,
-#                 vip_ip,
-#                 vip_port,
-#                 irules,
-#                 pool_port)
-#
-#lets_print_this_bitch(build_vip)
+
+
+build_node = build_node(f5_partition,
+                        **node_dict)
+
+for node in build_node:
+    print(node)
+
+build_pool = build_pool(f5_partition,
+                name,
+                node_dict,
+                allow_nat,
+                allow_snat,
+                ramp_time,
+                monitor,
+                node_priority,
+                pool_port)
+
+for pool in build_pool:
+    print(pool)
+
+
+
+build_vip = build_vip(f5_partition,
+                      name,
+                      vip_ip,
+                      vip_port,
+                      irules_list,
+                      pool_port)
+
+lets_print_this_bitch(build_vip)
 #
 
