@@ -1,202 +1,226 @@
-import urllib3
+import urllib3, configparser, os
+
 from f5.bigip import ManagementRoot
 
 urllib3.disable_warnings()
 
-mgmt = ManagementRoot("x.x.x.x", "username", "password")
-ltm = mgmt.tm.ltm
-pools = ltm.pools
-virtual_address = ltm.virtual_address_s
-virtual_servers = ltm.virtuals
-get_nodes = ltm.nodes.get_collection()
-
-
-# unpack collection
-# for server in virtual_servers.get_collection():
-#     print(server.raw)
-
-# for node in ltm.nodes.get_collection():
-#     print(node.raw)
-
-
-# existing_nodes = mgmt.tm.ltm.nodes.get_collection()
-
-
-# build node
-# test_jason_node = ltm.nodes.node.create(partition='CDE-DMZ',name='test_jason01', address='10.98.10.254', description='this is a test node created via the SDK')
-# print(test_jason_node.raw)
-
-def build_node(f5_partition, node_name, node_address):
-    """
-    builds an F5 node
-    :param f5_partition:
-    :param node_name:
-    :param node_address:
-    :param node_desc:
-    :return:
-    """
+def build_node(f5_partition,
+               **kwargs):
+    output = []
     try:
         existing_nodes = mgmt.tm.ltm.nodes.get_collection()
     except ValueError:
-        print("Could not connect to F5")
+        error = "Could not connect to F5: {}".format(ValueError)
+        output.append(error)
     else:
-        node_list = [node.name for node in existing_nodes]
-        if node_name in node_list:
-            print("{} exists".format(node_name))
-        else:
-            node_desc = '{}.werner.com'.format(node_name)
-            node = mgmt.tm.ltm.nodes.node.create(partition=f5_partition, name=node_name, address=node_address,
-                                                 description=node_desc)
-            return node.raw
+        for node_name, node_address in kwargs.items():
+            node_list = [(node.address).split('%')[0] for node in existing_nodes]
+            if node_address in node_list:
+                exists = "{} exists".format(node_address)
+                output.append(exists)
+            else:
+                node_desc = '{}.werner.com'.format(node_name)
+                node = mgmt.tm.ltm.nodes.node.create(partition=f5_partition,
+                                                     name=node_name,
+                                                     address=node_address,
+                                                     description=node_desc)
+                output.append(node.raw)
+        return output
 
 
-def build_pool(f5_partition, pool_name, node_list, allow_nat, allow_snat, ramp_time, monitor):
-    """
-    builds F5 pool and adds nodes specified in list to pool
-    :param f5_partition:
-    :param pool_name:
-    :param node_list:
-    :return:
-    """
-    # create pool and add nodes
+def build_pool(f5_partition,
+               name,
+               node_dict,
+               allow_nat,
+               allow_snat,
+               ramp_time,
+               monitor,
+               node_priority,
+               pool_port):
+    output = []
     try:
         existing_pools = mgmt.tm.ltm.pools.get_collection()
     except ValueError:
-        print("Could not connect to F5")
+        error = "Could not connect to F5: {}".format(ValueError)
+        output.append(error)
     else:
         pool_list = [pool.name for pool in existing_pools]
+        if pool_port == '80':
+            pool_name = '{}_{}_pool'.format(name,
+                                            pool_port)
+        elif pool_port == '443':
+            pool_name = '{}_{}_pool'.format(name,
+                                            pool_port)
+        else:
+            pool_name = '{}_{}_pool'.format(name,
+                                            pool_port)
+
         if pool_name in pool_list:
-            print("{} exists".format(pool_name))
+            exists = "{} exists".format(pool_name)
+            output.append(exists)
         else:
             pool_desc = '{}.werner.com'.format(pool_name)
             monitor_path = '/Common/{}'.format(monitor)
-            pool = mgmt.tm.ltm.pools.pool.create(partition=f5_partition, name=pool_name, description=pool_desc,allowNat=allow_nat,allowSnat=allow_snat, slowRampTime=ramp_time, monitor=monitor_path)
-            my_pool = mgmt.tm.ltm.pools.pool.load(partition=f5_partition, name=pool_name)
-            for node in node_list:
-                add_nodes = my_pool.members_s.members.create(partition=f5_partition, name=node)
+            pool = mgmt.tm.ltm.pools.pool.create(partition=f5_partition,
+                                                 name=pool_name,
+                                                 description=pool_desc,
+                                                 allowNat=allow_nat,
+                                                 allowSnat=allow_snat,
+                                                 slowRampTime=ramp_time,
+                                                 monitor=monitor_path)
+
+            my_pool = mgmt.tm.ltm.pools.pool.load(partition=f5_partition,
+                                                  name=pool_name)
+            node_list = ['{}:{}'.format(name, vip_port) for name, ip in node_dict.items()]
+            node_zip = zip(node_list, node_priority)
+
+            # for node in node_list:
+            for node, priority in node_zip:
+                # need to figure out priortyGroup settings
+
+                add_nodes = my_pool.members_s.members.create(partition=f5_partition,
+                                                             name=node,
+                                                             priorityGroup=priority)
                 test = my_pool.members_s.get_collection()
                 for x in test:
                     print(x.raw)
 
-                print('{} was added to {}'.format(add_nodes.name, pool.name))
+                node_msg = '{} was added to {}'.format(add_nodes.name,
+                                                       pool.name)
+                output.append(node_msg)
+        return output
 
 
-# return pool.raw
+def build_vip(f5_partition,
+              name,
+              vip_ip,
+              vip_port,
+              irules,
+              pool_port):
 
+    output = []
 
-
-
-def build_vip(f5_partition, vip_name, vip_ip, vip_port, pool_name):
     try:
         existing_vips = mgmt.tm.ltm.virtuals.get_collection()
     except ValueError:
-        print("Could not connect to F5")
+        error = "Could not connect to F5: {}".format(ValueError)
+        output.append(error)
     else:
-        vip_list = [vip.name for vip in existing_vips]
-        if vip_name in vip_list:
-            print("{} exists".format(vip_name))
+        if vip_port == '80':
+            vip_name = '{}-http-{}'.format(name,
+                                           vip_port)
+        elif vip_port == '443':
+            vip_name = '{}-https-{}'.format(name,
+                                            vip_port)
         else:
-            vip_desc = '{}.werner.com'.format(vip_name)
-            vip_pool = '/{}/{}'.format(f5_partition, pool_name)
-            vip_dest = '/{}/{}%10:{}'.format(f5_partition, vip_ip, vip_port)
+            vip_name = '{}-{}'.format(name,
+                                      vip_port)
 
-            # node = mgmt.tm.ltm.nodes.node.create(partition=f5_partition, name=node_name, address=node_address,description=vip_desc)
-            vip = ltm.virtuals.virtual.create(partition=f5_partition, name=vip_name, description=vip_desc,
-                                              destination=vip_dest, pool=vip_pool)
-            return vip.raw
+        vip_list = [vip.name for vip in existing_vips]
+
+        if vip_name in vip_list:
+            exists = "{} exists".format(vip_name)
+            output.append(exists)
+        else:
+            vip_desc = '{}.werner.com'.format(name)
+            vip_pool = '/{}/{}_{}_pool'.format(f5_partition,
+                                               name,
+                                               pool_port)
+            vip_dest = '/{}/{}%10:{}'.format(f5_partition,
+                                             vip_ip,
+                                             vip_port)
+            vip_rules = '/Common/http_security'
+            vip_protocol = 'tcp'
+
+            vip = ltm.virtuals.virtual.create(partition=f5_partition,
+                                              name=vip_name,
+                                              description=vip_desc,
+                                              destination=vip_dest,
+                                              pool=vip_pool,
+                                              ipProtocol=vip_protocol,
+                                              sourceAddressTranslation={'type': 'automap'},
+                                              profiles='http',
+                                              rules=irules)
+            output.append(vip.raw)
+        return output
+
+def lets_print_this_bitch(some_list):
+
+    for thingamob in some_list:
+        return thingamob
+
+# mgmt = ManagementRoot("x.x.x.x",
+#                       "username",
+#                       "password")
+# ltm = mgmt.tm.ltm
 
 
-# test_jason_vip = ltm.virtuals.virtual.create(partition='CDE-DMZ', name='test_jason_http-80', description='this is a test VIP created via the SDK', destination='/CDE-DMZ/10.98.0.254%10:80', pool='/CDE-DMZ/test_jason_http_80')
+ini_file = configparser.ConfigParser()
+savepath = '/Users/jmarter/PycharmProjects/ADC/F5/'
+filename = 'test.ini'
+fullpath = os.path.join(savepath, filename)
 
-# existing_nodes = mgmt.tm.ltm.virtuals.get_collection()
+ini_file.read(fullpath)
+config_read = ini_file.read(fullpath)
+
+#general settings from ini
+general = ini_file['general']
+name = general.get('name')
+f5_partition = general.get('f5_partition')
+
+#build node from ini
+nodes = ini_file['nodes']
+node_list = [nodes.get(field) for field in nodes]
+node_name = node_list[0::3]
+node_priority = node_list[1::3]
+node_ips = node_list[2::3]
+node_dict = dict(zip(node_name,
+                     node_ips))
+
+
+
+# build_node = build_node(f5_partition,
+#                         **node_dict)
 #
+# for node in build_node:
+#     print(node)
+
+#build pool from ini
+pool = ini_file['pool']
+pool_list = [pool.get(field) for field in pool]
+allow_nat = pool_list[0]
+allow_snat = pool_list[1]
+ramp_time = pool_list[2]
+monitor = pool_list[3]
+pool_port = pool_list[4]
+
+# build_pool = build_pool(f5_partition,
+#                 name,
+#                 node_dict,
+#                 allow_nat,
+#                 allow_snat,
+#                 ramp_time,
+#                 monitor,
+#                 node_priority,
+#                 pool_port)
+# for pool in build_pool:
+#     print(pool)
+
+#build vip from ini
+vip = ini_file['vip']
+irules = ini_file['irules']
+vip_list = [vip.get(field) for field in vip]
+vip_ip = vip_list[0::2]
+vip_port = vip_list[1::2]
+irules_list = [irules.get(field) for field in irules]
+
+# build_vip = build_vip(f5_partition,
+#                 name,
+#                 vip_ip,
+#                 vip_port,
+#                 irules,
+#                 pool_port)
 #
-# for node in existing_nodes:
-#     print(node.name)
-
-
-
-
-
-
-# load an existing pool
-# test_jason_pool = mgmt.tm.ltm.pools.pool.load(partition='CDE-DMZ', name='test_jason_http_80')
-# test_jason_pool_member = test_jason_pool.members_s.members
-
+#lets_print_this_bitch(build_vip)
 #
 
-# add node to pool
-# test_jason_pool_member_add = test_jason_pool_member.create(partition='CDE-DMZ', name='test_jason01:80')
-# test_jason_pool.members_s.members.create(partition='CDE-DMZ', name='test_jason01:80')
-# get pool memebers
-# get_test_jason_pool_members = test_jason_pool.members_s.get_collection()
-# print(test_jason_pool_member.raw)
-
-
-
-# test = mgmt.tm.ltm.pools.get_collection()
-#
-# for pool in test:
-#
-#     print(pool.name)
-#     for member in pool.members_s.get_collection():
-#
-#         print(member.name)
-
-
-f5_partition = 'CDE-DMZ'
-node_dict = {'test_jason01': '10.98.10.252', 'test_jason02': '10.98.10.253', 'test_jason03': '10.98.10.254'}
-pool_name = 'test_jason_http_80'
-node_list = ['test_jason01:80', 'test_jason02:443']
-vip_name = 'test_jason_http-80'
-vip_ip = '10.98.0.254'
-vip_port = '80'
-
-allow_nat = 'no'
-allow_snat = 'no'
-ramp_time = '5'
-monitor = 'tcp'
-
-# test_jason_vip = ltm.virtuals.virtual.create(partition='CDE-DMZ', name='test_jason_http-80', description='this is a test VIP created via the SDK', destination='/CDE-DMZ/10.98.0.254%10:80', pool='/CDE-DMZ/test_jason_http_80')
-
-# loop to build nodes
-for node_name, node_address in node_dict.items():
-    building_nodes = build_node(f5_partition, node_name, node_address)
-    #print(building_nodes)
-
-#zz = build_pool(f5_partition, pool_name, node_list)
-zz = build_pool(f5_partition, pool_name, node_list, allow_nat, allow_snat, ramp_time, monitor)
-
-print(zz)
-
-# vip = build_vip(f5_partition, vip_name, vip_ip, vip_port, pool_name)
-
-vip = build_vip(f5_partition, vip_name, vip_ip, vip_port, pool_name)
-print(vip)
-
-
-# existing_pools = mgmt.tm.ltm.pools.get_collection()
-#
-#
-# for pool in existing_pools:
-#     print(pool.raw)
-
-
-
-
-
-
-# load an existing pool
-# test_jason_pool = mgmt.tm.ltm.pools.pool.load(partition='CDE-DMZ', name='test_jason_http_80')
-# test_jason_pool_member = test_jason_pool.members_s.members
-
-# add node to pool
-# test_jason_pool_member_add = test_jason_pool_member.create(partition='CDE-DMZ', name='test_jason01:80')
-
-# get pool memebers
-# get_test_jason_pool_members = test_jason_pool.members_s.get_collection()
-# print(test_jason_pool_member.raw)
-
-# build VIP and add pool
-# test_jason_vip = ltm.virtuals.virtual.create(partition='CDE-DMZ', name='test_jason_http-80', description='this is a test VIP created via the SDK', destination='/CDE-DMZ/10.98.0.254%10:80', pool='/CDE-DMZ/test_jason_http_80')
-# print(test_jason_vip.raw)
