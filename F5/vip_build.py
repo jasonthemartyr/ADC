@@ -4,6 +4,7 @@ from f5.bigip import ManagementRoot
 
 urllib3.disable_warnings()
 
+
 def build_node(f5_partition,
                **kwargs):
     output = []
@@ -97,7 +98,6 @@ def build_vip(f5_partition,
               vip_port,
               irules,
               pool_port):
-
     output = []
 
     try:
@@ -144,16 +144,16 @@ def build_vip(f5_partition,
             output.append(vip.raw)
         return output
 
-def lets_print_this_bitch(some_list):
 
+def lets_print_this_bitch(some_list):
     for thingamob in some_list:
         return thingamob
+
 
 mgmt = ManagementRoot("x.x.x.x",
                       "username",
                       "password")
 ltm = mgmt.tm.ltm
-
 
 ini_file = configparser.ConfigParser()
 savepath = '/Users/jmarter/PycharmProjects/ADC/F5/'
@@ -163,12 +163,12 @@ fullpath = os.path.join(savepath, filename)
 ini_file.read(fullpath)
 config_read = ini_file.read(fullpath)
 
-#general settings from ini
+# general settings from ini
 general = ini_file['general']
 name = general.get('name')
 f5_partition = general.get('f5_partition')
 
-#build node from ini
+# build node from ini
 nodes = ini_file['nodes']
 node_list = [nodes.get(field) for field in nodes]
 node_name = node_list[0::3]
@@ -177,11 +177,7 @@ node_ips = node_list[2::3]
 node_dict = dict(zip(node_name,
                      node_ips))
 
-
-
-
-
-#build pool from ini
+# build pool from ini
 pool = ini_file['pool']
 pool_list = [pool.get(field) for field in pool]
 allow_nat = pool_list[0]
@@ -190,9 +186,7 @@ ramp_time = pool_list[2]
 monitor = pool_list[3]
 pool_port = pool_list[4]
 
-
-
-#build vip from ini
+# build vip from ini
 vip = ini_file['vip']
 irules = ini_file['irules']
 vip_list = [vip.get(field) for field in vip]
@@ -200,28 +194,22 @@ vip_ip = vip_list[0]
 vip_port = vip_list[1]
 irules_list = [irules.get(field) for field in irules]
 
-
-
 build_node = build_node(f5_partition,
                         **node_dict)
 
-for node in build_node:
-    print(node)
+lets_print_this_bitch(build_node)
 
 build_pool = build_pool(f5_partition,
-                name,
-                node_dict,
-                allow_nat,
-                allow_snat,
-                ramp_time,
-                monitor,
-                node_priority,
-                pool_port)
+                        name,
+                        node_dict,
+                        allow_nat,
+                        allow_snat,
+                        ramp_time,
+                        monitor,
+                        node_priority,
+                        pool_port)
 
-for pool in build_pool:
-    print(pool)
-
-
+lets_print_this_bitch(build_pool)
 
 build_vip = build_vip(f5_partition,
                       name,
@@ -232,4 +220,3 @@ build_vip = build_vip(f5_partition,
 
 lets_print_this_bitch(build_vip)
 #
-
