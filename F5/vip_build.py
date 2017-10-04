@@ -150,7 +150,7 @@ def lets_print_this_bitch(some_list):
         print(thingamob)
 
 
-mgmt = ManagementRoot("X.X.X.X",
+mgmt = ManagementRoot("x.x.x.x",
                       "username",
                       "password")
 ltm = mgmt.tm.ltm
@@ -242,3 +242,45 @@ build_vip = build_vip(f5_partition,
 lets_print_this_bitch(build_vip)
 
 """
+
+
+
+
+#trying to update VIP with profile:
+
+#load existing VIP sub collection
+vip_subcol = mgmt.tm.ltm.virtuals.virtual.load(partition='CDE-DMZ', name='test_jason-https-443')
+
+
+
+#sub resources to modify
+for stuff in vip_subcol.raw:
+    print(stuff)
+print('###########')
+print('###########')
+
+#print one of the sub resources
+print(vip_subcol.policiesReference)
+
+print('###########')
+print('###########')
+
+
+#attempt to modify sub resource (profile specifically)
+for profile in vip_subcol.profiles_s.get_collection():
+
+    #attempt to update profile on sub resource
+    # print(profile.raw)
+    #profile.name='http'
+    # profile.name='udp'
+    #profile.fullPath='/Common/tcp-mobile-optimized'
+    # profile.context='clientside'
+    # profile.partition='Common'
+    # profile.name='tcp-mobile-optimized'x
+    # profile.fullPath='/Common/tcp-mobile-optimized'
+    # profile.context='serverside'
+    # profile.partition = 'Common'
+
+    #print profiles attached to VIP test_jason-https-443
+    print(profile.raw)
+
