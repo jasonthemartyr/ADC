@@ -147,13 +147,29 @@ def build_vip(f5_partition,
 
 def lets_print_this_bitch(some_list):
     for thingamob in some_list:
-        return thingamob
+        print(thingamob)
 
 
-mgmt = ManagementRoot("x.x.x.x",
+mgmt = ManagementRoot("X.X.X.X",
                       "username",
                       "password")
 ltm = mgmt.tm.ltm
+
+#Change Load Balancing Method (needs to be added)
+#pool_a = mgmt.tm.ltm.pools.pool.load(name='test', partition='Common')
+#pool_a.update(loadBalancingMode='least-connections-member')
+
+# for virtual in ltm.virtuals.get_collection():
+#     virt = ltm.virtuals.virtual.load(partition='CDE-DMZ', name='test_jason-https-443')
+#     print(virt.profiles_s.raw)
+#
+#     for profile in virt.profiles_s.get_collection():
+#         print('123')
+#         #print(profile.raw)
+#         #print ("Partition: %s Virtual: %s Profile: %s" % (virtual.partition, virtual.name, profile.name))
+#
+
+
 
 ini_file = configparser.ConfigParser()
 savepath = '/Users/jmarter/PycharmProjects/ADC/F5/'
@@ -194,6 +210,11 @@ vip_ip = vip_list[0]
 vip_port = vip_list[1]
 irules_list = [irules.get(field) for field in irules]
 
+
+"""
+
+
+
 build_node = build_node(f5_partition,
                         **node_dict)
 
@@ -219,4 +240,5 @@ build_vip = build_vip(f5_partition,
                       pool_port)
 
 lets_print_this_bitch(build_vip)
-#
+
+"""
